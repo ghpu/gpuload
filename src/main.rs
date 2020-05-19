@@ -12,6 +12,7 @@ use subprocess;
 fn main() {
     eprintln!("GPULoad monitoring");
     let args: Vec<String>=env::args().collect();
+    eprintln!("GPULoad revision {}",env!("VERGEN_SHA_SHORT"));
     if args.len() < 2 {
         eprintln!("Syntax : {} child_process child_args...", args[0]);
         std::process::exit(1);
