@@ -26,9 +26,14 @@ fn main() {
     let nbsamples2 = Arc::new(Mutex::new(0.0));
 
 
-    let child = args[1].clone();
+    let exec_path = args[1].clone();
+    let child :String = match exec_path.rsplit("/").next() {
+        Some(p) => p.into(),
+        None => exec_path.into()
+    };
+    
 
-    let mut process = subprocess::Exec::cmd(child.clone()).args(&args[2..]).popen().unwrap();
+    let mut process = subprocess::Exec::cmd(args[1].clone()).args(&args[2..]).popen().unwrap();
     let pid = process.pid();
 
     let started2 = Arc::new(atomic::AtomicBool::new(false));
@@ -53,8 +58,6 @@ fn main() {
                 let processes = device.running_compute_processes().unwrap();
                 let urate = device.utilization_rates().unwrap();
                 let mut old = stats.lock().unwrap();
-                old[gpu_id as usize] += urate.gpu as f32;
-                *nbsamples.lock().unwrap() += 1.0;
 
                 let mut found = false;
                 for p in processes {
@@ -69,6 +72,8 @@ fn main() {
                         if name.contains(&child) {
                             found = true;
                             acc_mem_used += match p.used_gpu_memory { nvml_wrapper::enums::device::UsedGpuMemory::Used(t) => t, _ => 0};
+                            old[gpu_id as usize] += urate.gpu as f32;
+                            *nbsamples.lock().unwrap() += 1.0;
                         }
                     }
 
@@ -99,8 +104,9 @@ fn main() {
     t.join();
     for gpu_id in 0..dc {
         let s = stats2.lock().unwrap();
-        let nbs = *nbsamples2.lock().unwrap();
-        println!("GPULoad   gpu {}  kernel time use {:.2} %  memory used {:.0} bytes", gpu_id, s[gpu_id as usize]/nbs, s[gpu_id as usize + dc as usize]/nbs);
+        let mut nbs = nbsamples2.lock().unwrap();
+        if *nbs == 0.0 { *nbs = 1.0};
+        println!("GPULoad   gpu {}  kernel time use {:.2} %  memory used {:.0} bytes", gpu_id, s[gpu_id as usize] / *nbs, s[gpu_id as usize + dc as usize] / *nbs);
 
     }
 
