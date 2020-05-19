@@ -14,3 +14,7 @@ procinfo = ""
 
 [build-dependencies]
 vergen = "3"
+
+[profile.release]
+opt-level = 'z'
+lto = true
