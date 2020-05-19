@@ -1,10 +1,26 @@
 use nvml_wrapper::NVML;
+use procinfo::pid;
 use std::env;
+use std::process;
 use std::thread;
 use std::time;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic;
+
+
+fn get_parents(pid: u32) -> Vec<u32> {
+    let stat = pid::stat(pid as i32);
+    match stat {
+        Ok(s) => { 
+            match s.ppid {
+                0 => vec![],
+                1 => vec![],
+                _ => {let mut result = vec![s.ppid as u32]; result.extend_from_slice(&get_parents(s.ppid as u32)); result}
+        }},
+        _ =>vec![],
+    }
+}
 
 
 fn main() {
@@ -19,17 +35,10 @@ fn main() {
     let nvml = NVML::init().unwrap();
     let dc = nvml.device_count().unwrap();
     eprintln!("{} gpus found",dc);
+    let pid = process::id();
 
     let stats2 = Arc::new(Mutex::new(vec![0.0;2* dc as usize]));
     let nbsamples2 = Arc::new(Mutex::new(0.0));
-
-
-    let exec_path = args[1].clone();
-    let child :String = match exec_path.rsplit('/').next() {
-        Some(p) => p.into(),
-        None => exec_path
-    };
-    
 
     let mut process = subprocess::Exec::cmd(args[1].clone()).args(&args[2..]).popen().unwrap();
 
@@ -58,15 +67,16 @@ fn main() {
 
                 let mut found = false;
                 for p in processes {
-                    let name = nvml.sys_process_name(p.pid,65536).unwrap_or_else(|_| "".to_string()); // 65536 : max length for process name, otherwise truncated
-                    if name.contains(&child) {
+                    let parents = get_parents(p.pid);
+
+                    if parents.contains(&pid) {
                         let already_started = started.swap(true,atomic::Ordering::Relaxed);
                         if !already_started {
                             eprintln!("GPULoad started");
                         }
                     }
                     if started.load(atomic::Ordering::Relaxed) &&
-                        name.contains(&child) {
+                        parents.contains(&pid) {
                             found = true;
                             acc_mem_used += match p.used_gpu_memory { nvml_wrapper::enums::device::UsedGpuMemory::Used(t) => t, _ => 0};
                             old[gpu_id as usize] += urate.gpu as f32;
