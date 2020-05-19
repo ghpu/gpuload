@@ -1,5 +1,6 @@
 use nvml_wrapper::NVML;
 use std::env;
+use std::process;
 use std::thread;
 use std::time;
 use std::sync::Arc;
@@ -10,6 +11,10 @@ use subprocess;
 fn main() {
     println!("GPULoad monitoring");
     let args: Vec<String>=env::args().collect();
+    if args.len() < 2 {
+        println!("Syntax : {} child_process child_args...", args[0]);
+        std::process::exit(1);
+    }
     let child = args[1].clone();
     let mut process = subprocess::Exec::cmd(child.clone()).args(&args[2..]).popen().unwrap();
     let pid = process.pid();
@@ -33,8 +38,9 @@ fn main() {
             println!("{:?}",memory_info);
 
             while !finished.load(atomic::Ordering::Relaxed) {
-                let mut acc: u64 = 0;
-                let processes = device.running_graphics_processes().unwrap();
+                let mut acc_mem_used: u64 = 0;
+                let processes = device.running_compute_processes().unwrap();
+                let urate = device.utilization_rates().unwrap();
 
                 let mut found = false;
                 for p in processes {
@@ -48,13 +54,15 @@ fn main() {
                     if started.load(atomic::Ordering::Relaxed) {
                         if name.contains(&child) {
                             found = true;
-                            acc += match p.used_gpu_memory { nvml_wrapper::enums::device::UsedGpuMemory::Used(t) => t, _ => 0};
+                            acc_mem_used += match p.used_gpu_memory { nvml_wrapper::enums::device::UsedGpuMemory::Used(t) => t, _ => 0};
                         }
                     }
 
                 }
-                println!("Used memory : {}",acc);
-                if found==false {
+                println!("Used memory : {}",acc_mem_used);
+                println!("Used gpu {}: kernel {} % , mermory {} %",gpu_id, urate.gpu, urate.memory);
+
+                if started.load(atomic::Ordering::Relaxed) && found==false {
                     finished.swap(true,atomic::Ordering::Relaxed);
                 } else {
                     thread::sleep(time::Duration::from_millis(1000));
