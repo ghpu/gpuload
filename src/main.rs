@@ -24,9 +24,8 @@ fn get_parents(pid: u32) -> Vec<u32> {
 
 
 fn main() {
-    eprintln!("GPULoad monitoring");
     let args: Vec<String>=env::args().collect();
-    eprintln!("GPULoad revision {}",env!("VERGEN_SHA_SHORT"));
+    eprintln!("GPULoad monitoring, revision {}",env!("VERGEN_SHA_SHORT"));
     if args.len() < 2 {
         eprintln!("Syntax : {} child_process child_args...", args[0]);
         std::process::exit(1);
@@ -57,7 +56,6 @@ fn main() {
 
             let device = nvml.device_by_index(gpu_id).unwrap();
             let memory_info = device.memory_info().unwrap();
-            eprintln!("{:?}",memory_info);
 
             while !finished.load(atomic::Ordering::Relaxed) {
                 let mut acc_mem_used: u64 = 0;
@@ -83,9 +81,6 @@ fn main() {
                             *nbsamples.lock().unwrap() += 1.0;
                         }
                 }
-                eprintln!("gpu {}: Used memory : {}", gpu_id, acc_mem_used);
-                eprintln!("gpu {}: kernel {} % , memory {} %", gpu_id, urate.gpu, urate.memory);
-
                 old[dc as usize + gpu_id as usize] += acc_mem_used as f32;
                 drop(old);
 
