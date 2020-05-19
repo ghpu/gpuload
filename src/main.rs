@@ -55,7 +55,6 @@ fn main() {
         for gpu_id in 0..dc {
 
             let device = nvml.device_by_index(gpu_id).unwrap();
-            let memory_info = device.memory_info().unwrap();
 
             while !finished.load(atomic::Ordering::Relaxed) {
                 let mut acc_mem_used: u64 = 0;
