@@ -1,6 +1,5 @@
 use nvml_wrapper::NVML;
 use std::env;
-use std::process;
 use std::thread;
 use std::time;
 use std::sync::Arc;
@@ -34,7 +33,6 @@ fn main() {
     
 
     let mut process = subprocess::Exec::cmd(args[1].clone()).args(&args[2..]).popen().unwrap();
-    let pid = process.pid();
 
     let started2 = Arc::new(atomic::AtomicBool::new(false));
     let finished2 = Arc::new(atomic::AtomicBool::new(false));
@@ -44,7 +42,7 @@ fn main() {
     let stats = Arc::clone(&stats2);
     let nbsamples = Arc::clone(&nbsamples2);
 
-    let mut t = thread::spawn(move || {
+    let t = thread::spawn(move || {
 
 
         for gpu_id in 0..dc {
@@ -78,8 +76,8 @@ fn main() {
                     }
 
                 }
-                eprintln!("Used memory : {}",acc_mem_used);
-                eprintln!("Used gpu {}: kernel {} % , memory {} %",gpu_id, urate.gpu, urate.memory);
+                eprintln!("gpu {}: Used memory : {}", gpu_id, acc_mem_used);
+                eprintln!("gpu {}: kernel {} % , memory {} %", gpu_id, urate.gpu, urate.memory);
 
                 old[dc as usize + gpu_id as usize] += acc_mem_used as f32;
                 drop(old);
@@ -98,10 +96,10 @@ fn main() {
         }
 
     });
-    process.wait();
+    process.wait().unwrap();
     finished2.swap(true,atomic::Ordering::Relaxed);
 
-    t.join();
+    t.join().unwrap();
     for gpu_id in 0..dc {
         let s = stats2.lock().unwrap();
         let mut nbs = nbsamples2.lock().unwrap();
