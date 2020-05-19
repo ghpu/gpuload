@@ -49,7 +49,7 @@ fn main() {
 
             while !finished.load(atomic::Ordering::Relaxed) {
                 let mut acc_mem_used: u64 = 0;
-                let processes = device.running_graphics_processes().unwrap();
+                let processes = device.running_compute_processes().unwrap();
                 let urate = device.utilization_rates().unwrap();
                 let mut old = stats.lock().unwrap();
                 old[gpu_id as usize] += urate.gpu as f32;
