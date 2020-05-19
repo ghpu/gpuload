@@ -5,7 +5,6 @@ use std::time;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic;
-use subprocess;
 
 
 fn main() {
@@ -26,9 +25,9 @@ fn main() {
 
 
     let exec_path = args[1].clone();
-    let child :String = match exec_path.rsplit("/").next() {
+    let child :String = match exec_path.rsplit('/').next() {
         Some(p) => p.into(),
-        None => exec_path.into()
+        None => exec_path
     };
     
 
@@ -59,22 +58,20 @@ fn main() {
 
                 let mut found = false;
                 for p in processes {
-                    let name = nvml.sys_process_name(p.pid,65536).unwrap_or("".to_string()); // 65536 : max length for process name, otherwise truncated
+                    let name = nvml.sys_process_name(p.pid,65536).unwrap_or_else(|_| "".to_string()); // 65536 : max length for process name, otherwise truncated
                     if name.contains(&child) {
                         let already_started = started.swap(true,atomic::Ordering::Relaxed);
-                        if already_started == false {
+                        if !already_started {
                             eprintln!("GPULoad started");
                         }
                     }
-                    if started.load(atomic::Ordering::Relaxed) {
-                        if name.contains(&child) {
+                    if started.load(atomic::Ordering::Relaxed) &&
+                        name.contains(&child) {
                             found = true;
                             acc_mem_used += match p.used_gpu_memory { nvml_wrapper::enums::device::UsedGpuMemory::Used(t) => t, _ => 0};
                             old[gpu_id as usize] += urate.gpu as f32;
                             *nbsamples.lock().unwrap() += 1.0;
                         }
-                    }
-
                 }
                 eprintln!("gpu {}: Used memory : {}", gpu_id, acc_mem_used);
                 eprintln!("gpu {}: kernel {} % , memory {} %", gpu_id, urate.gpu, urate.memory);
@@ -83,7 +80,7 @@ fn main() {
                 drop(old);
 
 
-                if started.load(atomic::Ordering::Relaxed) && found==false {
+                if started.load(atomic::Ordering::Relaxed) && !found {
                     finished.swap(true,atomic::Ordering::Relaxed);
                 } else {
                     thread::sleep(time::Duration::from_millis(1000));
