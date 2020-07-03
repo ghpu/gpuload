@@ -9,6 +9,8 @@ build = "build.rs"
 subprocess = ""
 nvml-wrapper = ""
 procinfo = ""
+ctrlc = ""
+libc = ""
 
 [build-dependencies]
 vergen = "3"

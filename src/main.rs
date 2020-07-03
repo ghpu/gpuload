@@ -45,6 +45,7 @@ fn main() {
         .args(&args[2..])
         .popen()
         .unwrap();
+    let process_id = process.pid().unwrap();
 
     let started2 = Arc::new(atomic::AtomicBool::new(false));
     let finished2 = Arc::new(atomic::AtomicBool::new(false));
@@ -96,6 +97,10 @@ fn main() {
             eprintln!("GPULoad finished");
         }
     });
+    ctrlc::set_handler(move || {
+        unsafe { libc::kill(process_id as i32, libc::SIGINT) };
+    })
+    .expect("Cannot set SIGINT handler");
     process.wait().unwrap();
     finished2.swap(true, atomic::Ordering::Relaxed);
 
