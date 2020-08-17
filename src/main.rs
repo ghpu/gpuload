@@ -14,11 +14,14 @@ fn get_parents(pid: u32) -> Vec<u32> {
         Ok(s) => match s.ppid {
             0 => vec![],
             1 => vec![],
-            p => if p == pid as i32 {vec![]} else
-            {
-                let mut result = vec![s.ppid as u32];
-                result.extend_from_slice(&get_parents(s.ppid as u32));
-                result
+            p => {
+                if p == pid as i32 {
+                    vec![]
+                } else {
+                    let mut result = vec![s.ppid as u32];
+                    result.extend_from_slice(&get_parents(s.ppid as u32));
+                    result
+                }
             }
         },
         _ => vec![],
@@ -39,7 +42,7 @@ fn main() {
     let pid = process::id();
 
     let stats2 = Arc::new(Mutex::new(vec![0.0; 2 * dc as usize]));
-    let nbsamples2 = Arc::new(Mutex::new(0.0));
+    let nbsamples2 = Arc::new(Mutex::new(vec![0.0; 2 * dc as usize]));
 
     let mut process = subprocess::Exec::cmd(args[1].clone())
         .args(&args[2..])
@@ -64,6 +67,7 @@ fn main() {
                 let processes = device.running_compute_processes().unwrap();
                 let urate = device.utilization_rates().unwrap();
                 let mut old = stats.lock().unwrap();
+                let mut nbs = nbsamples.lock().unwrap();
 
                 let mut found = false;
                 for p in processes {
@@ -82,7 +86,7 @@ fn main() {
                             _ => 0,
                         };
                         old[gpu_id as usize] += urate.gpu as f32;
-                        *nbsamples.lock().unwrap() += 1.0;
+                        nbs[gpu_id as usize] += 1.0;
                     }
                 }
                 old[dc as usize + gpu_id as usize] += acc_mem_used as f32;
@@ -107,15 +111,16 @@ fn main() {
     t.join().unwrap();
     for gpu_id in 0..dc {
         let s = stats2.lock().unwrap();
-        let mut nbs = nbsamples2.lock().unwrap();
-        if *nbs == 0.0 {
-            *nbs = 1.0
+        let nbs = nbsamples2.lock().unwrap();
+        let mut nbs = nbs[gpu_id as usize];
+        if nbs == 0.0 {
+            nbs = 1.0
         };
         println!(
             "GPULoad   gpu {}  kernel time use {:.2} %  memory used {:.0} bytes",
             gpu_id,
-            s[gpu_id as usize] / *nbs,
-            s[gpu_id as usize + dc as usize] / *nbs
-            );
+            s[gpu_id as usize] / nbs,
+            s[gpu_id as usize + dc as usize] / nbs
+        );
     }
 }
