@@ -59,17 +59,17 @@ fn main() {
     let nbsamples = Arc::clone(&nbsamples2);
 
     let t = thread::spawn(move || {
-        for gpu_id in 0..dc {
-            let device = nvml.device_by_index(gpu_id).unwrap();
+        while !finished.load(atomic::Ordering::Relaxed) {
+            let mut found = false;
+            for gpu_id in 0..dc {
+                let device = nvml.device_by_index(gpu_id).unwrap();
 
-            while !finished.load(atomic::Ordering::Relaxed) {
                 let mut acc_mem_used: u64 = 0;
                 let processes = device.running_compute_processes().unwrap();
                 let urate = device.utilization_rates().unwrap();
                 let mut old = stats.lock().unwrap();
                 let mut nbs = nbsamples.lock().unwrap();
 
-                let mut found = false;
                 for p in processes {
                     let parents = get_parents(p.pid);
 
@@ -91,15 +91,15 @@ fn main() {
                 }
                 old[dc as usize + gpu_id as usize] += acc_mem_used as f32;
                 drop(old);
-
-                if started.load(atomic::Ordering::Relaxed) && !found {
-                    finished.swap(true, atomic::Ordering::Relaxed);
-                } else {
-                    thread::sleep(time::Duration::from_millis(1000));
-                }
             }
-            eprintln!("GPULoad finished");
+
+            if started.load(atomic::Ordering::Relaxed) && !found {
+                finished.swap(true, atomic::Ordering::Relaxed);
+            } else {
+                thread::sleep(time::Duration::from_millis(1000));
+            }
         }
+        eprintln!("GPULoad finished");
     });
     ctrlc::set_handler(move || {
         unsafe { libc::kill(process_id as i32, libc::SIGINT) };
