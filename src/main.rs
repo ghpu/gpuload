@@ -116,7 +116,7 @@ fn main() {
         if nbs == 0.0 {
             nbs = 1.0
         };
-        println!(
+        eprintln!(
             "GPULoad   gpu {}  kernel time use {:.2} %  memory used {:.0} bytes",
             gpu_id,
             s[gpu_id as usize] / nbs,
