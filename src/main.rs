@@ -14,8 +14,8 @@ fn get_parents(pid: u32) -> Vec<u32> {
         Ok(s) => match s.ppid {
             0 => vec![],
             1 => vec![],
-            pid => vec![],
-            _ => {
+            p => if p == pid as i32 {vec![]} else
+            {
                 let mut result = vec![s.ppid as u32];
                 result.extend_from_slice(&get_parents(s.ppid as u32));
                 result
@@ -116,6 +116,6 @@ fn main() {
             gpu_id,
             s[gpu_id as usize] / *nbs,
             s[gpu_id as usize + dc as usize] / *nbs
-        );
+            );
     }
 }
